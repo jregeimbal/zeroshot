@@ -358,7 +358,7 @@ function getPlatformConfig(platform, config = {}) {
     github: {
       prName: 'PR',
       prNameLower: 'pull request',
-      createCmd: `gh pr create${prBase ? ` --base ${prBase}` : ''} --title "feat: {{issue_title}}" --body "Closes #{{issue_number}}"`,
+      createCmd: `gh pr create --head "$(git branch --show-current)"${prBase ? ` --base ${prBase}` : ''} --title "feat: {{issue_title}}" --body "Closes #{{issue_number}}"`,
       mergeCmd: useMergeQueue
         ? `PR_ID="$(timeout 30 gh pr view --json id --jq .id)"
 gh api graphql -f query='mutation($id:ID!){enqueuePullRequest(input:{pullRequestId:$id}){mergeQueueEntry{state}}}' -f id="$PR_ID"
@@ -516,11 +516,18 @@ git commit -m "feat: implement #{{issue_number}} - {{issue_title}}"
 \`\`\`
 Run this command. Do not skip it.
 
-### STEP 4: Push to origin (MANDATORY)
+### STEP 4: Verify branch and push to origin (MANDATORY)
 \`\`\`bash
+CURRENT_BRANCH="$(git branch --show-current)"
+echo "Current branch: $CURRENT_BRANCH"
+DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null || echo main)"
+if [ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ]; then
+  echo "BLOCKED: git-pusher is on the default branch '$CURRENT_BRANCH'. Pushing here would bypass the PR. This is a zeroshot configuration error — the agent must run in a worktree, not the main repo."
+fi
 git push -u origin HEAD
 \`\`\`
-Run this. If it fails, do not edit files, rebase, or resolve conflicts. Output blocked JSON with the failure summary.
+Run the branch check first — if you are on the default branch, output blocked JSON immediately and do not push. Otherwise push and continue.
+If push fails, do not edit files, rebase, or resolve conflicts. Output blocked JSON with the failure summary.
 
 ⚠️ AFTER PUSH YOU ARE NOT DONE! CONTINUE TO STEP 5! ⚠️
 
@@ -583,6 +590,7 @@ Only do this AFTER the ${prName} is merged.`
 - Execute EVERY step in order (1, 2, 3, 4, 5, 6)
 - Do NOT skip git add -A
 - Do NOT skip git commit
+- Do NOT push if the current branch is the default branch — check first and output blocked JSON if so
 - Do NOT skip ${createCmd.split(' ').slice(0, 3).join(' ')} - THE TASK IS NOT DONE UNTIL ${prName} EXISTS
 - Do NOT skip ${mergeCmd.split(' ').slice(0, 4).join(' ')} - attempt merge or auto-merge before reporting blocked${requiresPrIdExtraction ? '\n- MUST extract PR ID from step 5 output to use in step 6' : ''}
 - Do NOT edit files after validator handoff
