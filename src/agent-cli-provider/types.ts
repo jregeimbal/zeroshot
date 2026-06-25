@@ -77,6 +77,7 @@ export interface OpencodeCliFeatures extends BaseCliFeatures {
   readonly supportsModel: boolean;
   readonly supportsVariant: boolean;
   readonly supportsCwd: boolean;
+  readonly supportsDir: boolean;
   readonly supportsAutoApprove: false;
 }
 
