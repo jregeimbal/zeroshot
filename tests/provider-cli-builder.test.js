@@ -226,6 +226,96 @@ describe('Opencode provider helper builder', function () {
     assert.ok(result.args.includes('--variant'));
     assert.ok(result.args.includes('high'));
   });
+
+  // Regression tests for the opencode worktree isolation bug.
+  //
+  // Root cause: opencode follows the .git file pointer in a git worktree back to
+  // the main repo, setting its internal CWD to the main repo path. File operations
+  // (read, edit, write) then target the main repo instead of the isolated worktree.
+  //
+  // Fix: pass --dir <worktree_path> explicitly. With --dir, opencode uses the path
+  // as-is without resolving gitdir. Process CWD alone is insufficient.
+  //
+  // Observed in cluster spinning-cosmos-71: opencode session log showed
+  //   cwd=/opt/data/latent-space-dance-off   (main repo)
+  // even though it was spawned in
+  //   /opt/data/home/.zeroshot/worktrees/spinning-cosmos-71  (worktree)
+  describe('worktree isolation via --dir flag', function () {
+    it('passes --dir <cwd> when supportsDir is true', function () {
+      const result = buildCommand('opencode', 'test prompt', {
+        cwd: '/worktrees/spinning-cosmos-71',
+        cliFeatures: { supportsDir: true, supportsCwd: false },
+      });
+
+      assert.ok(result.args.includes('--dir'), 'expected --dir flag in args');
+      assert.ok(
+        result.args.includes('/worktrees/spinning-cosmos-71'),
+        'expected worktree path in args'
+      );
+      assert.ok(!result.args.includes('--cwd'), '--cwd must not be used when supportsDir is true');
+    });
+
+    it('falls back to --cwd when supportsCwd is true and supportsDir is false', function () {
+      const result = buildCommand('opencode', 'test prompt', {
+        cwd: '/worktrees/spinning-cosmos-71',
+        cliFeatures: { supportsDir: false, supportsCwd: true },
+      });
+
+      assert.ok(result.args.includes('--cwd'), 'expected --cwd flag in args');
+      assert.ok(!result.args.includes('--dir'), '--dir must not be used when supportsDir is false');
+    });
+
+    it('sets commandSpec.cwd even when neither --dir nor --cwd flag is supported', function () {
+      const result = buildCommand('opencode', 'test prompt', {
+        cwd: '/worktrees/spinning-cosmos-71',
+        cliFeatures: { supportsDir: false, supportsCwd: false },
+      });
+
+      assert.strictEqual(
+        result.cwd,
+        '/worktrees/spinning-cosmos-71',
+        'commandSpec.cwd must be set so the process spawns in the worktree'
+      );
+      assert.ok(!result.args.includes('--dir'));
+      assert.ok(!result.args.includes('--cwd'));
+    });
+
+    it('detects supportsDir from help text containing --dir', function () {
+      const { opencodeAdapter } = require('../lib/agent-cli-provider/adapters/opencode');
+      const features = opencodeAdapter.detectCliFeatures(
+        'Usage: opencode run [options]\n  --dir  Working directory\n  --model  Model to use\n'
+      );
+
+      assert.strictEqual(
+        features.supportsDir,
+        true,
+        'supportsDir must be true when --dir appears in help text'
+      );
+      assert.strictEqual(
+        features.supportsCwd,
+        false,
+        'supportsCwd must be false when --cwd is absent from help text'
+      );
+    });
+
+    it('detects supportsDir as false from help text without --dir', function () {
+      const { opencodeAdapter } = require('../lib/agent-cli-provider/adapters/opencode');
+      const features = opencodeAdapter.detectCliFeatures(
+        'Usage: opencode run [options]\n  --cwd  Working directory\n'
+      );
+
+      assert.strictEqual(
+        features.supportsDir,
+        false,
+        'supportsDir must be false when --dir is absent from help text'
+      );
+      assert.strictEqual(
+        features.supportsCwd,
+        true,
+        'supportsCwd must be true when --cwd appears in help text'
+      );
+    });
+  });
 });
 
 describe('Claude provider helper builder', function () {
