@@ -98,6 +98,7 @@ export interface CliFeatureOverrides {
   readonly supportsJson?: boolean;
   readonly supportsOutputSchema?: boolean;
   readonly supportsCwd?: boolean;
+  readonly supportsDir?: boolean;
   readonly supportsConfigOverride?: boolean;
   readonly supportsSkipGitRepoCheck?: boolean;
   readonly supportsVariant?: boolean;
