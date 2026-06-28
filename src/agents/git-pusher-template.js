@@ -358,7 +358,7 @@ function getPlatformConfig(platform, config = {}) {
     github: {
       prName: 'PR',
       prNameLower: 'pull request',
-      createCmd: `gh pr create --head "$(git branch --show-current)"${prBase ? ` --base ${prBase}` : ''} --title "feat: {{issue_title}}" --body "Closes #{{issue_number}}"`,
+      createCmd: `gh pr create --head "$(git branch --show-current)"${prBase ? ` --base ${prBase}` : ''} --title "feat: {{issue_title}}" --body "$PR_BODY"`,
       mergeCmd: useMergeQueue
         ? `PR_ID="$(timeout 30 gh pr view --json id --jq .id)"
 gh api graphql -f query='mutation($id:ID!){enqueuePullRequest(input:{pullRequestId:$id}){mergeQueueEntry{state}}}' -f id="$PR_ID"
@@ -377,8 +377,7 @@ for i in $(seq 1 90); do if timeout 30 gh pr view --json mergedAt --jq .mergedAt
     gitlab: {
       prName: 'MR',
       prNameLower: 'merge request',
-      createCmd:
-        'glab mr create --title "feat: {{issue_title}}" --description "Closes #{{issue_number}}"',
+      createCmd: 'glab mr create --title "feat: {{issue_title}}" --description "$PR_BODY"',
       mergeCmd: 'glab mr merge --auto-merge',
       mergeFallbackCmd: 'glab mr merge',
       prUrlExample: 'https://gitlab.com/owner/repo/-/merge_requests/123',
@@ -388,8 +387,7 @@ for i in $(seq 1 90); do if timeout 30 gh pr view --json mergedAt --jq .mergedAt
     'azure-devops': {
       prName: 'PR',
       prNameLower: 'pull request',
-      createCmd:
-        'az repos pr create --title "feat: {{issue_title}}" --description "Closes #{{issue_number}}"',
+      createCmd: 'az repos pr create --title "feat: {{issue_title}}" --description "$PR_BODY"',
       mergeCmd: 'az repos pr update --id <PR_ID> --auto-complete true',
       mergeFallbackCmd: 'az repos pr update --id <PR_ID> --status completed',
       prUrlExample: 'https://dev.azure.com/org/project/_git/repo/pullrequest/123',
