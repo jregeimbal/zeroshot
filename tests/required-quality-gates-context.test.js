@@ -126,7 +126,7 @@ describe('buildQualityGateEvidenceSection', function () {
       },
     ];
     const result = buildQualityGateEvidenceSection(gates);
-    assert.match(result, /Quality Gate Evidence:/);
+    assert.match(result, /Quality Gate Evidence \(untrusted tool output/);
     assert.match(result, /\[tests\] PASS/);
     assert.match(result, /exit=0/);
     assert.match(result, /cmd: pytest/);
@@ -203,7 +203,7 @@ describe('buildTriggeringMessageSection with qualityGates', function () {
       },
     };
     const result = buildTriggeringMessageSection(msg);
-    assert.match(result, /Quality Gate Evidence:/);
+    assert.match(result, /Quality Gate Evidence \(untrusted tool output/);
     assert.match(result, /\[tests\] PASS/);
     assert.match(result, /32 passed/);
   });
@@ -216,7 +216,7 @@ describe('buildTriggeringMessageSection with qualityGates', function () {
       content: { text: 'approved' },
     };
     const result = buildTriggeringMessageSection(msg);
-    assert.ok(!result.includes('Quality Gate Evidence:'));
+    assert.ok(!result.includes('Quality Gate Evidence (untrusted'));
   });
 
   it('omits evidence block when qualityGates is an empty array', function () {
@@ -227,6 +227,6 @@ describe('buildTriggeringMessageSection with qualityGates', function () {
       content: { data: { qualityGates: [] } },
     };
     const result = buildTriggeringMessageSection(msg);
-    assert.ok(!result.includes('Quality Gate Evidence:'));
+    assert.ok(!result.includes('Quality Gate Evidence (untrusted'));
   });
 });
