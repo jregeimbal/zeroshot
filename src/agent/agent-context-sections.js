@@ -371,6 +371,12 @@ function buildTriggeringMessageSection(triggeringMessage) {
     lines.push('', triggeringMessage.content.text);
   }
 
+  const qualityGates = triggeringMessage.content?.data?.qualityGates;
+  const evidenceSection = buildQualityGateEvidenceSection(qualityGates);
+  if (evidenceSection) {
+    lines.push('', evidenceSection);
+  }
+
   return `${lines.join('\n')}\n`;
 }
 

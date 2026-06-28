@@ -183,3 +183,50 @@ describe('buildQualityGateEvidenceSection', function () {
     assert.ok(result.indexOf('[tests]') < result.indexOf('[lint]'));
   });
 });
+
+describe('buildTriggeringMessageSection with qualityGates', function () {
+  it('includes quality gate evidence when qualityGates present in content.data', function () {
+    const { buildTriggeringMessageSection } = require('../src/agent/agent-context-sections');
+    const msg = {
+      topic: 'VALIDATION_RESULT',
+      sender: 'validator',
+      content: {
+        data: {
+          qualityGates: [
+            {
+              id: 'tests',
+              status: 'PASS',
+              evidence: { command: 'pytest', exitCode: 0, output: '32 passed' },
+            },
+          ],
+        },
+      },
+    };
+    const result = buildTriggeringMessageSection(msg);
+    assert.match(result, /Quality Gate Evidence:/);
+    assert.match(result, /\[tests\] PASS/);
+    assert.match(result, /32 passed/);
+  });
+
+  it('omits evidence block when qualityGates is absent', function () {
+    const { buildTriggeringMessageSection } = require('../src/agent/agent-context-sections');
+    const msg = {
+      topic: 'VALIDATION_RESULT',
+      sender: 'validator',
+      content: { text: 'approved' },
+    };
+    const result = buildTriggeringMessageSection(msg);
+    assert.ok(!result.includes('Quality Gate Evidence:'));
+  });
+
+  it('omits evidence block when qualityGates is an empty array', function () {
+    const { buildTriggeringMessageSection } = require('../src/agent/agent-context-sections');
+    const msg = {
+      topic: 'VALIDATION_RESULT',
+      sender: 'validator',
+      content: { data: { qualityGates: [] } },
+    };
+    const result = buildTriggeringMessageSection(msg);
+    assert.ok(!result.includes('Quality Gate Evidence:'));
+  });
+});
