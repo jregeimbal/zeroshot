@@ -311,6 +311,53 @@ function buildValidatorSkipSection({ role, messageBus, cluster, isolation }) {
   return buildCannotValidateSection(cannotValidateCriteria);
 }
 
+function truncateGateOutput(output) {
+  if (typeof output !== 'string' || output.trim() === '') return null;
+  const lines = output.split('\n');
+  let truncated = false;
+  let result;
+  if (lines.length > 5) {
+    result = lines.slice(-5).join('\n');
+    truncated = true;
+  } else {
+    result = output;
+  }
+  if (result.length > 500) {
+    result = result.slice(-500);
+    truncated = true;
+  }
+  return { text: result, truncated };
+}
+
+function buildQualityGateEvidenceSection(qualityGates) {
+  if (!Array.isArray(qualityGates) || qualityGates.length === 0) return '';
+  const parts = ['Quality Gate Evidence:'];
+  for (const gate of qualityGates) {
+    const id =
+      (typeof gate?.id === 'string' && gate.id.trim()) ||
+      (typeof gate?.name === 'string' && gate.name.trim()) ||
+      'unknown';
+    const status = String(gate?.status || 'UNKNOWN').toUpperCase();
+    const evidence = gate?.evidence && typeof gate.evidence === 'object' ? gate.evidence : {};
+    const headerParts = [`- [${id}] ${status}`];
+    if (evidence.exitCode !== undefined) headerParts.push(`exit=${evidence.exitCode}`);
+    if (typeof evidence.command === 'string' && evidence.command.trim()) {
+      headerParts.push(`cmd: ${evidence.command}`);
+    }
+    parts.push(headerParts.join(' | '));
+    const truncated = truncateGateOutput(evidence.output);
+    if (truncated) {
+      parts.push('  output:');
+      for (const line of truncated.text.split('\n')) {
+        parts.push(`  ${line}`);
+      }
+      if (truncated.truncated) parts.push('  [truncated]');
+    }
+    parts.push('');
+  }
+  return parts.join('\n');
+}
+
 function buildTriggeringMessageSection(triggeringMessage) {
   const lines = [
     '',
@@ -333,6 +380,7 @@ module.exports = {
   buildJsonSchemaSection,
   buildLegacyOutputSchemaSection,
   buildRepoToolingSection,
+  buildQualityGateEvidenceSection,
   buildTriggeringMessageSection,
   buildValidatorSkipSection,
 };
