@@ -417,7 +417,7 @@ const SUPPORTED_PLATFORMS = ['github', 'gitlab', 'azure-devops'];
  * @param {Object} config - Platform configuration from PLATFORM_CONFIGS
  * @returns {string} The complete prompt with platform-specific commands
  */
-function generatePrompt(config) {
+function generatePrompt(config, requiredQualityGates = []) {
   const {
     prName,
     prNameLower,
@@ -431,6 +431,29 @@ function generatePrompt(config) {
     usesMergeQueue,
     closeIssueMode,
   } = config;
+
+  const hasQualityGates = Array.isArray(requiredQualityGates) && requiredQualityGates.length > 0;
+
+  const qualityGateBodyInstructions = hasQualityGates
+    ? `
+Include the quality gate evidence from the "Quality Gate Evidence" section of your context.
+Format it as:
+
+## Quality Gate Evidence
+
+| Gate | Status | Exit | Command |
+|------|--------|------|---------|
+| <id> | ✅ PASS / ❌ FAIL / ⚠️ UNAVAILABLE | <exit> | \`<cmd>\` |
+
+<details><summary><id> output</summary>
+
+\`\`\`
+<output from context>
+\`\`\`
+
+</details>
+`
+    : '';
 
   // Azure-specific instructions for PR ID extraction
   const azurePrIdNote = requiresPrIdExtraction
@@ -531,7 +554,25 @@ If push fails, do not edit files, rebase, or resolve conflicts. Output blocked J
 ⚠️ AFTER PUSH YOU ARE NOT DONE! CONTINUE TO STEP 5! ⚠️
 
 ### STEP 5: CREATE THE ${prName.toUpperCase()} (MANDATORY - YOU MUST RUN THIS COMMAND)
+
+First, collect the change overview:
 \`\`\`bash
+git log --oneline HEAD~5..HEAD
+git diff --stat HEAD~1
+\`\`\`
+Use this output to write a 1–3 sentence summary of what was implemented.
+
+Then construct the PR body and create the ${prName}:
+\`\`\`bash
+PR_BODY="$(cat <<'EOFBODY'
+## Overview
+
+<your 1-3 sentence summary here>
+
+Closes #{{issue_number}}
+${qualityGateBodyInstructions}
+EOFBODY
+)"
 ${createCmd}
 \`\`\`
 🚨 YOU MUST RUN \`${createCmd.split(' ').slice(0, 3).join(' ')}\`! Outputting a link is NOT creating a ${prName}! 🚨
@@ -592,6 +633,7 @@ Only do this AFTER the ${prName} is merged.`
 - Do NOT push if the current branch is the default branch — check first and output blocked JSON if so
 - Do NOT skip ${createCmd.split(' ').slice(0, 3).join(' ')} - THE TASK IS NOT DONE UNTIL ${prName} EXISTS
 - Do NOT skip ${mergeCmd.split(' ').slice(0, 4).join(' ')} - attempt merge or auto-merge before reporting blocked${requiresPrIdExtraction ? '\n- MUST extract PR ID from step 5 output to use in step 6' : ''}
+- STEP 5 requires constructing $PR_BODY before running the create command — run git log/diff first to write the overview
 - Do NOT edit files after validator handoff
 - Do NOT debug product failures after validator handoff
 - If push, ${prName} creation, CI, or ${requiresPrIdExtraction ? 'auto-complete' : 'merge'} fails, report it instead of fixing code
@@ -650,7 +692,7 @@ function generateGitPusherAgent(platform, options = {}) {
         action: 'execute_task',
       },
     ],
-    prompt: generatePrompt(platformConfig),
+    prompt: generatePrompt(platformConfig, requiredQualityGates),
     hooks: {
       onComplete: {
         action: 'verify_pull_request',
